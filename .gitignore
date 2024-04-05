@@ -11,6 +11,7 @@ examples/test_*
 examples/*.txt
 examples/*.png
 experiments/*
+examples/reservoir_computing/hyper_param_search/
 
 # C extensions
 *.so
@@ -103,3 +104,4 @@ ENV/
 
 # pytest cache
 .pytest_cache
+
