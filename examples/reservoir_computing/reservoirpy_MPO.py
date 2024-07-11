@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from .functions import get_best_params, get_predictions, simulator, data
-from .config import data_param, hyperopt_config, risk_model
+from .functions import get_best_params, get_predictions, simulator, data_full
+from .config import data_param, hyperopt_config, risk_model, reservoir_param
 
 import cvxportfolio as cvx
 
@@ -26,9 +26,8 @@ def main() -> int:
         json.dump(hyperopt_config, f)
 
 
-    # set up the reservoir and get forecasted returns 1 day ahead
-    # new_data = get_rescaled_returns(data)
-    predictions, predictions_2 = get_predictions(data, data_param, hyperopt_config, instances = 3, hyper_search = data_param['hyper_search'], fixed_param = data_param['fixed_param'], online = data_param['online'], seed = 123)
+    # set up the reservoir and get forecasted returns
+    predictions, predictions_2 = get_predictions(data_full, data_param, reservoir_param, hyperopt_config, instances = 5, hyper_search = data_param['hyper_search'], fixed_param = False, online = data_param['online'], seed = 123)
 
     param = get_best_params(f"examples/reservoir_computing/hyper_param_search/{hyperopt_config['exp']}")
 
@@ -66,9 +65,7 @@ def main() -> int:
         
     # - 0.1 * cvx.ReturnsForecastError(cvx.forecast.HistoricalStandardDeviation)
 
-    # , benchmark = cvx.Uniform()
-
-    policy = cvx.MultiPeriodOptimization(objective, [constraints] * data_param["H"], ignore_dpp = True)
+    policy = cvx.MultiPeriodOptimization(objective, [constraints] * data_param["H"], ignore_dpp = True) # , benchmark = cvx.Uniform()
     # breakpoint()
     print(len(predictions[1].columns))
     print(predictions[1].columns)

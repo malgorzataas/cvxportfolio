@@ -1,4 +1,5 @@
 import cvxportfolio as cvx
+
 NDX100 = \
 ['AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMAT', 'AMD', 'AMGN',
  'AMZN', 'ANSS', 'ASML', 'AVGO', 'AZN', 'BIIB', 'BKNG', 'BKR', 'CCEP', 'CDNS',
@@ -30,9 +31,9 @@ UNIVERSE = ['AAPL', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMAT', 'AMD', 'AMGN',
 risk_model = cvx.FactorModelCovariance(num_factors=10)
 # set parameters for getting data
 # "date_from": '2019-05-10', '2015-01-01'
-data_param = {"stocks": NDX100, 'keep_stocks': False, "date_from": '2015-01-01', "date_to": '2024-05-01',
-              "H": 3, "long": False, "diagonal_cov": True, "soft_constraints": False, "train_set": 2, 
-              "online": False, "hyper_search": False, 'fixed_param': False} 
+data_param = {"stocks": NDX100, 'keep_stocks': False, "date_from": '2015-01-01', "date_to": '2024-06-01',
+              "H": 10, "long": False, "diagonal_cov": False, "soft_constraints": True, "train_set": 2, 
+              "online": False, "hyper_search": False, 'fixed_param': True, 'default_pred': True, 'default_pred2': False} 
 
 # H = planning horizon, keep_stocks: if True we'll keep all stocks listed and use only dates for which all stocks have data, otherwise stocks without data for specified dates will be dropped
 # train_set = how many years to take for training, diagonal_cov = whether to use diagonalcovariance, long = long or longshort portfolio, hyper_search: run hyper-parameter optimization or not
@@ -69,9 +70,9 @@ hyperopt_config = {
 }
 
 reservoir_param = {
-        "units": 35,             # the number of neurons
+        "units": 60,             # the number of neurons
         "spectral_radius": 0.9, 
         "leak_rate": 0.5, 
         "input_scaling": 0.7,           
-        "ridge": 1e-9      
+        "ridge": 1e-5      
         }

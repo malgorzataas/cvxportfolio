@@ -6,33 +6,29 @@ import json
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from arch import arch_model
+
 from reservoirpy.nodes import Reservoir, Ridge, FORCE
-from reservoirpy.observables import rmse, rsquare, nrmse
-from reservoirpy.datasets import to_forecasting
+from reservoirpy.observables import rmse, rsquare
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import FunctionTransformer
 from reservoirpy.hyper import research
 from cvxportfolio.errors import ProgramInfeasible
-from .config import data_param, risk_model, reservoir_param
+from .config import data_param, risk_model
 
 import cvxportfolio as cvx
 
 # get data
-def get_data(stocks_list, keep_stocks = True, date_from = '2019-05-10', date_to = '2024-05-01'):
+def get_data(stocks_list, keep_stocks = True, date_from = '2019-05-10'):
     # Get a data frame with stocks returns, VIX and interest rate to use to forecast returns
     df = cvx.DownloadedMarketData(stocks_list).returns
+    df = df.iloc[:-1,:]
     if keep_stocks:
         df.dropna(inplace = True)
-    dates = df.index[(df.index > date_from) & (df.index <= date_to)]
+    dates = df.index[(df.index > date_from)]
     df = df.loc[dates]
     if not keep_stocks:
         df.dropna(axis = 1, inplace = True)
         print(len(df.columns))
         print(df.columns)
-    # volumes = cvx.DownloadedMarketData(stocks_list).volumes
-    # volumes = volumes.add_suffix('_vol')
-    # df = df.merge(volumes, left_index = True, right_index = True, how = 'left')
     df.index = pd.to_datetime(df.index.date)
     df.rename(columns={"USDOLLAR": "rate"}, inplace = True)
     VIX = pd.DataFrame({'VIX':cvx.YahooFinance('^VIX').data.open})
@@ -42,17 +38,17 @@ def get_data(stocks_list, keep_stocks = True, date_from = '2019-05-10', date_to 
     print(df)
     return df
 
-data = get_data(data_param['stocks'], keep_stocks = data_param['keep_stocks'], date_from = data_param['date_from'], date_to = data_param['date_to'])
+data_full = get_data(data_param['stocks'], keep_stocks = data_param['keep_stocks'], date_from = data_param['date_from'])
 # define simulator
+data = data_full.loc[(data_full.index <= data_param['date_to'])]
 simulator = cvx.StockMarketSimulator(list(data.columns[:-2]))
-
-def get_test_timeindex(dates, y_test):
-    """Get Datetimeindex for test data"""
-    return dates[-y_test.shape[0]:]
 
 # define objective function, based on: https://reservoirpy.readthedocs.io/en/latest/user_guide/hyper.html
 
 def objective(data, config, **params):
+
+    data_full = data.copy()
+    data = data.loc[(data.index <= data_param['date_to'])]
 
     print("Start date:", str(data.index[0].date()))
     # Split a timeseries for forecasting tasks.
@@ -68,45 +64,38 @@ def objective(data, config, **params):
 
     # split data into train and test
     for i in range(config["H"]):
-        input_data[i+1] = list(to_forecasting(X, forecast= i+1, test_size = test_size))
+        input_data[i+1] = [X[:test_start_index-1], X[test_start_index-1:-1], X[i+1:test_start_index-1+i+1], []] 
         input_data[i+1][2] = input_data[i+1][2][:,:-2]
-        input_data[i+1][3] = input_data[i+1][3][:,:-2]
+        input_data[i+1][3] = np.array(data_full)[test_start_index-1+i+1:test_start_index-1+i+1+test_size,:-2]
 
 
     scaler = MinMaxScaler()
     X = np.array(data)
     X = scaler.fit_transform(X[:,:-2])
 
-    for i in range(config["H"]):
-        input_data[i+1][3] = scaler.inverse_transform(input_data[i+1][3])
-
-
     # Split timeseries for forecasting returns squared
     if config['diagonal_cov']:
         X_2 = np.array(data**2)
-        scaler = MinMaxScaler()
-        X_2 = scaler.fit_transform(X_2)
+        scaler_2 = MinMaxScaler()
+        X_2 = scaler_2.fit_transform(X_2)
 
 
         input_data_2 = {}
 
         # split data into train and test
         for i in range(config["H"]):
-            input_data_2[i+1] = list(to_forecasting(X_2, forecast= i+1, test_size = test_size))
+            input_data_2[i+1] = [X_2[:test_start_index-1], X_2[test_start_index-1:-1], X_2[i+1:test_start_index-1+i+1], []]
             input_data_2[i+1][2] = input_data_2[i+1][2][:,:-2]
-            input_data_2[i+1][3] = input_data_2[i+1][3][:,:-2]
+            input_data_2[i+1][3] = np.array(data_full**2)[test_start_index-1+i+1:test_start_index-1+i+1+test_size,:-2]
 
 
 
-        scaler = MinMaxScaler()
+        scaler_2 = MinMaxScaler()
         X_2 = np.array(data**2)
-        X_2 = scaler.fit_transform(X_2[:,:-2])
-
-        for i in range(config["H"]):
-            input_data_2[i+1][3] = scaler.inverse_transform(input_data_2[i+1][3])
+        X_2 = scaler_2.fit_transform(X_2[:,:-2])
 
 
-    test_index = get_test_timeindex(data.index, input_data[i+1][3])
+    test_index = data.index[test_start_index:]
     instances = config["instances_per_trial"]
 
     variable_seed = params["seed"]
@@ -172,7 +161,7 @@ def objective(data, config, **params):
                 
                 predictions_2[i+1][predictions_2[i+1] < 0] = 0
 
-                predictions_2[i+1] = scaler.inverse_transform(predictions_2[i+1])
+                predictions_2[i+1] = scaler_2.inverse_transform(predictions_2[i+1])
 
                 print("RMSE:", rmse(input_data_2[i+1][3], predictions_2[i+1]), "R^2 score:", rsquare(input_data_2[i+1][3], predictions_2[i+1]))
                 predictions_2[i+1] = pd.DataFrame(data = predictions_2[i+1], index = test_index, columns = list(data.columns[:-2]))
@@ -212,10 +201,6 @@ def objective(data, config, **params):
                 for constraint in constraints:
                     objective[i] -= (100 * cvx.SoftConstraint(constraint))
             constraints = []
-
-        # - 0.1 * cvx.ReturnsForecastError(cvx.forecast.HistoricalStandardDeviation)
-
-        # , benchmark = cvx.Uniform()
 
         policies.append(cvx.MultiPeriodOptimization(objective, [constraints] * config["H"], ignore_dpp = True))
 
@@ -262,30 +247,39 @@ def get_best_params(result_path):
 # from reservoirpy
 def plot_results(y_pred, y_test):
 
+    y_pred = pd.DataFrame(data = y_pred, index = y_test.index) 
+    # y_pred = y_pred.loc[(y_pred.index > '2019-12-31') & (y_pred.index <= '2022-12-31')]
+    # y_test = y_test.loc[(y_test.index > '2019-12-31') & (y_test.index <= '2022-12-31')]
+
     fig = plt.figure(figsize=(15, 7))
     plt.subplot(211)
-    plt.plot(np.arange(len(y_pred)), y_pred, lw=3, label="ESN prediction")
-    plt.plot(np.arange(len(y_pred)), y_test, linestyle="--", lw=2, label="True value")
-    plt.plot(np.abs(y_test - y_pred), label="Absolute deviation")
+    plt.xlabel("$Date$")
+    plt.ylabel("$Return$") 
+    plt.plot(y_test, linestyle="--", lw=2, label="True value")
+    plt.plot(y_pred.iloc[:,0], lw=3, label="ESN prediction")
+    # plt.plot(np.abs(y_test - y_pred), label="Absolute deviation")
 
     plt.legend()
     plt.show(block = False)
 
-def get_predictions(data, data_param, hyperopt_config, instances = 10, hyper_search = True, fixed_param = False, online = True, seed = 123):
+
+def get_predictions(data, data_param, reservoir_param, hyperopt_config, instances = 5, hyper_search = True, fixed_param = False, online = True, seed = 123):
     """Get predictions."""
     # get data 
-    # data = get_data(data_param['stocks'])
-
+    data_full = data.copy()
+    data = data.loc[(data.index <= data_param['date_to'])]
 
     if hyper_search:
         current_directory = os.getcwd()
         final_directory = os.path.join(current_directory, "examples/reservoir_computing/hyper_param_search")
-        best = research(objective, data, f"examples/reservoir_computing/hyper_param_search/{hyperopt_config['exp']}.config.json", final_directory)
+        best = research(objective, data_full, f"examples/reservoir_computing/hyper_param_search/{hyperopt_config['exp']}.config.json", final_directory)
 
     if fixed_param:
         param = reservoir_param
     else: 
         param = get_best_params(f"examples/reservoir_computing/hyper_param_search/{hyperopt_config['exp']}")
+
+    print(param)
 
     print("Start date:", str(data.index[0].date()))
     test_start_index = data.index.get_indexer([data.index[0] + pd.offsets.DateOffset(years=data_param['train_set'])], method = 'bfill')[0]
@@ -298,42 +292,40 @@ def get_predictions(data, data_param, hyperopt_config, instances = 10, hyper_sea
     input_data = {}
 
     for i in range(data_param["H"]):
-        input_data[i+1] = list(to_forecasting(X, forecast= i+1, test_size = test_size))
-        input_data[i+1][2] = input_data[i+1][2][:,:-2]
-        input_data[i+1][3] = input_data[i+1][3][:,:-2]
+        input_data[i+1] = [X[:test_start_index-1], X[test_start_index-1:-1], X[i+1:test_start_index-1+i+1], []]
+        input_data[i+1][2] = input_data[i+1][2][:,:-2] # y_train
+        input_data[i+1][3] = np.array(data_full)[test_start_index-1+i+1:test_start_index-1+i+1+test_size,:-2]
 
 
     scaler = MinMaxScaler()
     X = np.array(data)
     X = scaler.fit_transform(X[:,:-2])
 
-    for i in range(data_param["H"]):
-        input_data[i+1][3] = scaler.inverse_transform(input_data[i+1][3]) # y_test
-
     if data_param['diagonal_cov']:
 
         # Split timeseries for forecasting returns squared
 
         X_2 = np.array(data**2)
-        scaler = MinMaxScaler()
-        X_2 = scaler.fit_transform(X_2)
+        scaler_2 = MinMaxScaler()
+        X_2 = scaler_2.fit_transform(X_2)
 
 
         input_data_2 = {}
 
         # split data into train and test
         for i in range(data_param["H"]):
-            input_data_2[i+1] = list(to_forecasting(X_2, forecast= i+1, test_size = test_size))
+            # input_data_2[i+1] = list(to_forecasting(X_2, forecast= i+1, test_size = test_size))
+            input_data_2[i+1] = [X_2[:test_start_index-1], X_2[test_start_index-1:-1], X_2[i+1:test_start_index-1+i+1], []] # X_2[:test_start_index]
             input_data_2[i+1][2] = input_data_2[i+1][2][:,:-2]
-            input_data_2[i+1][3] = input_data_2[i+1][3][:,:-2]
+            input_data_2[i+1][3] = np.array(data_full**2)[test_start_index-1+i+1:test_start_index-1+i+1+test_size,:-2]
 
 
 
-        scaler = MinMaxScaler()
+        scaler_2 = MinMaxScaler()
         X_2 = np.array(data**2)
-        X_2 = scaler.fit_transform(X_2[:,:-2])
-
-    test_index = get_test_timeindex(data.index, input_data[1][3])
+        X_2 = scaler_2.fit_transform(X_2[:,:-2])
+        
+    test_index = data.index[test_start_index:]
 
     predictions = {}
     predictions_2 = {}
@@ -392,12 +384,15 @@ def get_predictions(data, data_param, hyperopt_config, instances = 10, hyper_sea
 
         if data_param['diagonal_cov']:
             pred_2 = np.mean(pred_2, axis = 0)
-            predictions_2[i+1] = scaler.inverse_transform(pred_2)
+            predictions_2[i+1] = scaler_2.inverse_transform(pred_2)
             predictions_2[i+1] = pd.DataFrame(data = predictions_2[i+1], index = test_index, columns = list(data.columns[:-2])) 
 
         
        # plot sample results
-    plot_results(np.array(predictions[1].iloc[:,1]), input_data[1][3][:,1])
+    # for i in range(data_param["H"]):
+    for i in range(1):
+        dates = data_full.index[test_start_index-1+i+1:test_start_index-1+i+1+test_size]
+        plot_results(np.array(predictions[1].iloc[:,0]), data_full.loc[dates].iloc[:,0])
 
     print(predictions[1])
 

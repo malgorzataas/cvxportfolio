@@ -11,7 +11,12 @@ examples/test_*
 examples/*.txt
 examples/*.png
 experiments/*
+examples/reservoir_computing/plots/
+examples/reservoir_computing/results_risk_return/
 examples/reservoir_computing/hyper_param_search/
+examples/reservoir_computing/*.ipynb
+examples/reservoir_computing/plot.py
+examples/reservoir_computing/MPO_default.py
 
 # C extensions
 *.so

@@ -24,12 +24,12 @@ data_param = {"stocks": ['AAPL', 'ABNB', 'ADBE', 'AMZN', 'ANSS', 'ASML', 'CDW', 
 # define simulator
 simulator = cvx.StockMarketSimulator(data_param['stocks'])
 # define constraints
-# constraints = [cvx.LongOnly(), cvx.LeverageLimit(1), cvx.MaxWeights(0.1)]
-constraints = [cvx.LeverageLimit(1), cvx.MaxWeights(0.15), cvx.MinWeights(-0.15)] # longshort
+constraints = [cvx.LongOnly(), cvx.LeverageLimit(1), cvx.MaxWeights(0.2)]
+# constraints = [cvx.LeverageLimit(1), cvx.MaxWeights(0.05), cvx.MinWeights(-0.05)] # longshort
 # add cvx.TurnoverLimit()
 # set parameters
 hyperopt_config = {
-    "exp": f"hyperopt_30_longshort_015", # the experimentation name
+    "exp": f"hyperopt_30_long_02", # the experimentation name
     "hp_max_evals": 100,             # the number of differents sets of parameters hyperopt has to try
     "hp_method": "random",           # the method used by hyperopt to choose those sets (see below)
     "seed": 40,                      # the random state seed, to ensure reproducibility
@@ -42,7 +42,7 @@ hyperopt_config = {
         "input_scaling": ["choice", 0.9],           # the input scaling is fixed
         "ridge": ["choice", 1e-7],        # the regularization parameter is fixed
         "seed": ["choice", 123],         # random seed for the ESN initialization
-        "gamma_risk": ["choice", 0.1, 0.5, 1, 5, 10, 25, 50], # risk aversion parameter 
+        "gamma_risk": ["choice", 0.1, 0.5, 1, 5, 10, 25, 50], # risk aversion parameter
         "gamma_trade": ["choice", 0.1, 0.5, 1, 5, 10, 25, 50], # trading risk aversion factor
         "gamma_hold": ["choice", 0.1, 0.5, 1, 5, 10, 25, 50], # holdings aversion parameter
         "kappa": ["choice", 0.05, 0.1, 0.5]  # covariance forecast error risk parameter
@@ -98,7 +98,8 @@ def get_test_timeindex(dates, y_test):
 
 # define objective function, based on: https://reservoirpy.readthedocs.io/en/latest/user_guide/hyper.html
 
-def objective(data, config, *, input_scaling, units, spectral_radius, leak_rate, ridge, seed, gamma_risk, gamma_trade, kappa, gamma_hold):
+def objective(data, config, **params):
+# def objective(data, config, *, input_scaling, units, spectral_radius, leak_rate, ridge, seed, gamma_risk, gamma_trade, kappa, gamma_hold):
 
 
     print("Start date:", str(data.index[0].date()))
@@ -112,27 +113,28 @@ def objective(data, config, *, input_scaling, units, spectral_radius, leak_rate,
     y_test = y_test[:,:len(config['stocks'])]
 
     instances = config["instances_per_trial"]
+    print(params)
 
-    variable_seed = seed
+    variable_seed = params['seed']
 
     scaler = MinMaxScaler()
     X = np.array(data)
     X = scaler.fit_transform(X[:,:len(data_param['stocks'])])
 
-    y_test = scaler.inverse_transform(y_test) 
+    y_test = scaler.inverse_transform(y_test)
     # y_test = np.exp(y_test) # use if predicting prices
 
 
     losses = []; information_ratio = []
     for n in range(instances):
         # Build your model given the input parameters
-        reservoir = Reservoir(units,
-                              sr=spectral_radius,
-                              lr=leak_rate,
-                              input_scaling = input_scaling,
+        reservoir = Reservoir(params['units'],
+                              sr=params['spectral_radius'],
+                              lr=params['leak_rate'],
+                              input_scaling = params['input_scaling'],
                               seed=variable_seed)
 
-        readout = Ridge(ridge=ridge)
+        readout = Ridge(ridge=params['ridge'])
 
         model = reservoir >> readout
 
@@ -140,7 +142,7 @@ def objective(data, config, *, input_scaling, units, spectral_radius, leak_rate,
         # Train your model and test your model.
         predictions = model.fit(X_train, y_train) \
                            .run(X_test)
-        
+
         # take squared returns
         predictions = scaler.inverse_transform(predictions)
         # predictions = np.exp(predictions)
@@ -151,13 +153,13 @@ def objective(data, config, *, input_scaling, units, spectral_radius, leak_rate,
         print(predicted_df)
         # predicted_df = predicted_df.pct_change()[1:] # use if predicted prices
         # predicted_df.index = test_index[:-1] # use if predicted prices
-        
-        objective = cvx.ReturnsForecast(r_hat = predicted_df) - gamma_risk * (
-            cvx.FullCovariance() + kappa * cvx.RiskForecastError()
-        ) - gamma_trade * cvx.StocksTransactionCost() - gamma_hold * cvx.StocksHoldingCost()
-        
+
+        objective = cvx.ReturnsForecast(r_hat = predicted_df) - params['gamma_risk'] * (
+            cvx.FullCovariance() + params['kappa'] * cvx.RiskForecastError()
+        ) - params['gamma_trade'] * cvx.StocksTransactionCost() - params['gamma_hold'] * cvx.StocksHoldingCost()
+
         # - gamma_hold * cvx.StocksHoldingCost()
-        
+
         # - 0.1 * cvx.ReturnsForecastError(cvx.forecast.HistoricalStandardDeviation)
 
         policy = cvx.SinglePeriodOptimization(objective, constraints)
@@ -206,7 +208,7 @@ def plot_results(y_pred, y_test, sample=500):
 
 def get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, test_size = 0.2, hyper_search = True, online = True, seed = 123):
     """Get predictions."""
-    # get data 
+    # get data
     data = get_data(data_param['stocks'])
     data.iloc[:,:len(data_param['stocks'])] = np.log(data.iloc[:,:len(data_param['stocks'])])
 
@@ -235,9 +237,9 @@ def get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, t
     for i in range(instances):
         reservoir = Reservoir(units = param['units'], input_scaling=param['input_scaling'], sr=param['spectral_radius'],
                       lr=param['leak_rate'], seed=param['seed'])
-        
+
         # if online:
-            
+
         #     readout = FORCE(alpha = param['ridge'])
 
         #     esn_online = reservoir >> readout
@@ -253,7 +255,7 @@ def get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, t
 
         # Train your model and test your model.
         pred = model.fit(X_train, y_train).run(X_test)
-        
+
         print(pred)
         predictions.append(pred)
         # Change the seed between instances
@@ -288,7 +290,7 @@ def get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, t
     return predicted_df, actual_df
 
 # set up the reservoir and get forecasted returns 1 day ahead
-predicted, actual = get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, test_size = 0.35, hyper_search = False, online = True, seed = 123)
+predicted, actual = get_predictions(data_param, hyperopt_config, forecast = 1, instances = 10, test_size = 0.35, hyper_search = True, online = True, seed = 123)
 print(predicted)
 print(actual)
 plot_results(np.array(predicted.iloc[:,0]), np.array(actual.iloc[:,0]), sample=100)
@@ -299,7 +301,7 @@ param = get_best_params(f"examples/reservoir_computing/hyper_param_search/{hyper
 print(predicted)
 objective1 = cvx.ReturnsForecast(r_hat = predicted) - param['gamma_risk'] * (
     cvx.FullCovariance() + param['kappa'] * cvx.RiskForecastError()
-) - param["gamma_trade"] * cvx.StocksTransactionCost() - param["gamma_hold"] * cvx.StocksHoldingCost()
+) - param["gamma_trade"] * cvx.StocksTransactionCost()
 # - param["gamma_hold"] * cvx.StocksHoldingCost()
 # - 0.1 * cvx.ReturnsForecastError(cvx.forecast.HistoricalStandardDeviation)
 
@@ -310,7 +312,7 @@ policy1 = cvx.SinglePeriodOptimization(objective1, constraints)
 # Single Period Optimization using default
 objective2 = cvx.ReturnsForecast() - param['gamma_risk'] * (
     cvx.FullCovariance() + param['kappa'] * cvx.RiskForecastError()
-) - param["gamma_trade"] * cvx.StocksTransactionCost() - param["gamma_hold"] * cvx.StocksHoldingCost()
+) - param["gamma_trade"] * cvx.StocksTransactionCost() 
 
 # - param["gamma_hold"] * cvx.StocksHoldingCost()
 
