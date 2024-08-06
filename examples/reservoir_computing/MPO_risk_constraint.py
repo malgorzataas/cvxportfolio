@@ -1,4 +1,4 @@
-"""Example of back-tests with risk term in constraints.
+"""Example of back-tests with risk term as constraint.
 
 """
 # In the root directory of the development environment: python -m examples.reservoir_computing.MPO_risk_constraint
@@ -17,7 +17,7 @@ from .config import data_param, hyperopt_config, reservoir_param
 
 import cvxportfolio as cvx
 
-param = {'turnover': 0.1, 'weight': 0.1, 'gamma_trade': 1, 'gamma_hold': 1, 'kappa': 0}
+param = {'turnover': 0.1, 'weight': 0.2, 'gamma_trade': 5, 'gamma_hold': 5, 'kappa': 0}
 if data_param['long']:
     param['leverage'] = 1
 else:
@@ -30,7 +30,7 @@ H = [1, 2, 5, 10]
 def main() -> int:
 
 
-    # set up the reservoir and get forecasted returns 1 day ahead
+    # set up the reservoir and get forecasts
     predictions, predictions_2 = get_predictions(data_full, data_param, reservoir_param, hyperopt_config, instances = 5, hyper_search = False, fixed_param = True, online = data_param['online'], seed = 123)
     
     start = time.time()
@@ -112,9 +112,7 @@ def main() -> int:
 
 
             policies.append(cvx.MultiPeriodOptimization(objective, [constraints] * data_param["H"], ignore_dpp = True, benchmark = cvx.Uniform()))
-        # breakpoint()
-        print(len(predictions[1].columns))
-        print(predictions[1].columns)
+
         test_dates = predictions[1].index
         print(str(test_dates[0].date()))
 
@@ -127,25 +125,6 @@ def main() -> int:
     print(time.time()-start)
 
     result_uniform = simulator.backtest(cvx.Uniform(), start_time = str(test_dates[0].date()), end_time = data_param['date_to'])
-
-    # for h in H:
-
-    #     plt.figure()
-    #     plt.plot(
-    #         [result.annualized_excess_volatility for result in results_df[h]],
-    #         [result.annualized_average_excess_return for result in results_df[h]],
-    #         '.-',
-    #         )
-    #     plt.legend()
-    #     plt.title(f'Back-Test Result (Out-Of-Sample) H = {h}')
-    #     plt.xlabel('Excess risk (annualized)')
-    #     plt.ylabel('Excess return (annualized)')
-
-
-    #     plt.show(block = False)
-
-    
-    # plt.figure()
 
     MPO_results = {}
     MPO_results['reservoir_param'] = reservoir_param

@@ -1,6 +1,9 @@
 """Example of back-tests with predictions obtained using reservoirpy.
 
-    To run this, you need to install ``reservoirpy``.
+This example tests different choices of gamma_risk parameter for different planning horizons.
+Depending on the config.py settings we can test different strategies. 
+
+To run this, you need to install ``reservoirpy``.
 """
 
 import json
@@ -19,7 +22,7 @@ import cvxportfolio as cvx
 
 # python -m examples.reservoir_computing.MPO_risk_return
 
-param = {'turnover': 0.1, 'weight': 0.1, 'gamma_trade': 1, 'gamma_hold': 1, 'kappa': 0}
+param = {'turnover': 0.1, 'weight': 0.2, 'gamma_trade': 5, 'gamma_hold': 5, 'kappa': 0}
 if data_param['long']:
     param['leverage'] = 1
 else:
@@ -118,8 +121,6 @@ def main() -> int:
                 
             policies.append(cvx.MultiPeriodOptimization(objective, [constraints] * data_param["H"], benchmark = cvx.Uniform(), ignore_dpp = True))
 
-        # print(len(predictions[1].columns))
-        # print(predictions[1].columns)
         test_dates = predictions[1].index
         print(str(test_dates[0].date()))
 
@@ -131,22 +132,6 @@ def main() -> int:
 
     result_uniform = simulator.backtest(cvx.Uniform(), start_time = str(test_dates[0].date()), end_time = data_param['date_to'])
 
-    # for h in H:
-
-    #     plt.figure()
-    #     plt.plot(
-    #         [result.annualized_excess_volatility for result in results_df[h]],
-    #         [result.annualized_average_excess_return for result in results_df[h]],
-    #         '.-',
-    #         )
-    #     plt.legend()
-    #     plt.title(f'Back-Test Result (Out-Of-Sample) H = {h}')
-    #     plt.xlabel('Excess risk (annualized)')
-    #     plt.ylabel('Excess return (annualized)')
-
-
-    #     plt.show(block = False)
-
     MPO_results = {}
     MPO_results['reservoir_param'] = reservoir_param
     for h in H: 
@@ -156,7 +141,7 @@ def main() -> int:
                       'risks': [result.annualized_excess_volatility for result in results_df[h]], 'returns': [result.annualized_average_excess_return for result in results_df[h]]}
         MPO_results[f'MPO_H_{h}'] = MPO_result
 
-    name = f"long_{str(data_param['long'])[0]}_diagonal_{str(data_param['diagonal_cov'])[0]}_defpred_{str(data_param['default_pred'])[0]}_defpred2_{str(data_param['default_pred2'])[0]}_soft_{str(data_param['soft_constraints'])[0]}"
+    name = f"long_{str(data_param['long'])[0]}_diagonal_{str(data_param['diagonal_cov'])[0]}_defpred_{str(data_param['default_pred'])[0]}_defpred2_{str(data_param['default_pred2'])[0]}_soft_{str(data_param['soft_constraints'])[0]}_turnover_{str(param['turnover'])[2:]}_weight_{str(param['weight'])[2:]}_trade_{str(param['gamma_trade'])}_hold_{str(param['gamma_hold'])}"
     with open(f"examples/reservoir_computing/results_risk_return/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}.json", "w+") as f:
         json.dump(MPO_results, f)
 

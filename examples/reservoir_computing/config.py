@@ -13,12 +13,6 @@ NDX100 = \
  'TSLA', 'TTD', 'TTWO', 'TXN', 'VRSK', 'VRTX', 'WBA', 'WBD', 'WDAY', 'XEL',
  'ZS']
 
-# UNIVERSE = ['AAPL', 'ABNB', 'ADBE', 'AMZN', 'ANSS', 'ASML', 'CDW', 'CEG',
-#             'CHTR', 'CTAS', 'CTSH', 'DASH','FTNT', 'GEHC', 'GFS','INTU',
-#             'ISRG', 'KDP','MDLZ', 'MELI', 'META','NXPI', 'ODFL', 'ON',
-#             'QCOM', 'REGN', 'ROP','TSLA', 'TTD', 'TTWO', 'TXN',
-#             'VRSK', 'VRTX', 'WBA', 'WBD', 'WDAY', 'XEL']
-
 UNIVERSE = ['AAPL', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMAT', 'AMD', 'AMGN',
        'AMZN', 'ANSS', 'AZN', 'BIIB', 'BKNG', 'CDNS', 'CMCSA', 'COST', 'CPRT',
        'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTSH', 'DLTR', 'EA', 'EXC', 'FAST',
@@ -32,20 +26,30 @@ risk_model = cvx.FactorModelCovariance(num_factors=10)
 # set parameters for getting data
 # "date_from": '2019-05-10', '2015-01-01'
 data_param = {"stocks": NDX100, 'keep_stocks': False, "date_from": '2015-01-01', "date_to": '2024-06-01',
-              "H": 10, "long": False, "diagonal_cov": False, "soft_constraints": True, "train_set": 2, 
-              "online": False, "hyper_search": False, 'fixed_param': True, 'default_pred': True, 'default_pred2': False} 
+              "H": 10, "long": True, "diagonal_cov": False, "soft_constraints": False, "train_set": 2, 
+              "online": False, "hyper_search": False, 'fixed_param': False, 'default_pred': False, 'default_pred2': False} 
 
-# H = planning horizon, keep_stocks: if True we'll keep all stocks listed and use only dates for which all stocks have data, otherwise stocks without data for specified dates will be dropped
-# train_set = how many years to take for training, diagonal_cov = whether to use diagonalcovariance, long = long or longshort portfolio, hyper_search: run hyper-parameter optimization or not
+# H = planning horizon, keep_stocks: if True we'll keep all stocks listed and use only dates for which all stocks have data,
+# otherwise stocks without data for specified dates will be dropped
+# train_set = how many years to take for training 
+# diagonal_cov = whether to use diagonalcovariance 
+# long = long or longshort portfolio
+# hyper_search: run hyper-parameter optimization or not
 
 # get objectives' parameters 
 obj_params = {}
-for i in range(data_param["H"]):
-    obj_params['kappa_' + str(i+1)] = ["choice", 0, 0.05, 0.1, 0.5]  # covariance forecast error risk parameter
-    obj_params['gamma_risk_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50]  # risk aversion parameter
-    obj_params['gamma_trade_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50]  # trading risk aversion factor
-    if not data_param['long']:
-        obj_params['gamma_hold_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50] # holdings aversion parameter
+# for i in range(data_param["H"]):
+#     obj_params['kappa_' + str(i+1)] = ["choice", 0, 0.05, 0.1, 0.5]  # covariance forecast error risk parameter
+#     obj_params['gamma_risk_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50]  # risk aversion parameter
+#     obj_params['gamma_trade_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50]  # trading risk aversion factor
+#     if not data_param['long']:
+#         obj_params['gamma_hold_' + str(i+1)] = ["choice", 0.5, 1, 5, 10, 25, 50] # holdings aversion parameter
+
+obj_params['kappa'] = ["choice", 0, 0.05, 0.1, 0.5]  # covariance forecast error risk parameter
+obj_params['gamma_risk'] = ["choice", 0.5, 1, 5, 10, 25, 50]  # risk aversion parameter
+obj_params['gamma_trade'] = ["choice", 0.5, 1, 5, 10, 25, 50]  # trading risk aversion factor
+if not data_param['long']:
+    obj_params['gamma_hold'] = ["choice", 0.5, 1, 5, 10, 25, 50] # holdings aversion parameter
 
 # set parameters for hyperparameter optimization
 hyperopt_config = {

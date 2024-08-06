@@ -1,3 +1,7 @@
+"""Functions needed for hyper-parameters search and getting data and forecasts.
+
+"""
+
 import os
 from os import path
 import json
@@ -175,26 +179,41 @@ def objective(data, config, **params):
             constraints = [cvx.LongOnly(), cvx.LeverageLimit(params['leverage']), cvx.TurnoverLimit(params['turnover']), cvx.MaxWeights(params['weight'])]
             for i in range(config["H"]):
                 if config['diagonal_cov']:
-                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
-                    cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
-                ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost())
+                #     objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
+                #     cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
+                # ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost())
+                # else:
+                #     objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
+                #     risk_model + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
+                # ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost())
+                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk"] * (
+                    cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa"] * cvx.RiskForecastError()
+                    ) - params["gamma_trade"] * cvx.StocksTransactionCost())
                 else:
-                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
-                    risk_model + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
-                ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost())
+                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk"] * (
+                    risk_model + params["kappa"] * cvx.RiskForecastError()
+                    ) - params["gamma_trade"] * cvx.StocksTransactionCost())
 
 
         else:
             constraints = [cvx.LeverageLimit(params['leverage']), cvx.TurnoverLimit(params['turnover']), cvx.MaxWeights(params['weight']), cvx.MinWeights(-params['weight'])] # longshort
             for i in range(config["H"]):
                 if config['diagonal_cov']:
-                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
-                    cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
-                ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost() - params["gamma_hold_" +str(i+1)] * cvx.StocksHoldingCost())
+                #     objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
+                #     cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
+                # ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost() - params["gamma_hold_" +str(i+1)] * cvx.StocksHoldingCost())
+                # else:
+                #     objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
+                #     risk_model + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
+                # ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost() - params["gamma_hold_" +str(i+1)] * cvx.StocksHoldingCost())
+                    
+                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk"] * (
+                    cvx.DiagonalCovariance(predictions_2[i+1]) + params["kappa"] * cvx.RiskForecastError()
+                ) - params["gamma_trade"] * cvx.StocksTransactionCost() - params["gamma_hold"] * cvx.StocksHoldingCost())
                 else:
-                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk_" +str(i+1)] * (
-                    risk_model + params["kappa_" + str(i+1)] * cvx.RiskForecastError()
-                ) - params["gamma_trade_" +str(i+1)] * cvx.StocksTransactionCost() - params["gamma_hold_" +str(i+1)] * cvx.StocksHoldingCost())
+                    objective.append(cvx.ReturnsForecast(r_hat = predictions[i+1]) - params["gamma_risk"] * (
+                    risk_model + params["kappa"] * cvx.RiskForecastError()
+                ) - params["gamma_trade"] * cvx.StocksTransactionCost() - params["gamma_hold"] * cvx.StocksHoldingCost())
 
         if config["soft_constraints"]:
             for i in range(config["H"]):
@@ -202,7 +221,7 @@ def objective(data, config, **params):
                     objective[i] -= (100 * cvx.SoftConstraint(constraint))
             constraints = []
 
-        policies.append(cvx.MultiPeriodOptimization(objective, [constraints] * config["H"], ignore_dpp = True))
+        policies.append(cvx.MultiPeriodOptimization(objective, [constraints] * config["H"], benchmark = cvx.Uniform(), ignore_dpp = True))
 
         # Change the seed between instances
         variable_seed += 1
@@ -239,9 +258,6 @@ def get_best_params(result_path):
     id = np.nanargmin([r["returned_dict"]['loss'] for r in results])
     # id = np.nanargmax([r["returned_dict"]['profit'] for r in results])
     return results[id]['current_params']
-
-
-
 
 
 # from reservoirpy

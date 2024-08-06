@@ -17,6 +17,7 @@ examples/reservoir_computing/hyper_param_search/
 examples/reservoir_computing/*.ipynb
 examples/reservoir_computing/plot.py
 examples/reservoir_computing/MPO_default.py
+examples/reservoir_computing/get_results.py
 
 # C extensions
 *.so
