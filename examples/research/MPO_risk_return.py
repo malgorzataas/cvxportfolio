@@ -142,8 +142,8 @@ def main() -> int:
         MPO_results[f'MPO_H_{h}'] = MPO_result
 
     name = f"long_{str(data_param['long'])[0]}_diagonal_{str(data_param['diagonal_cov'])[0]}_defpred_{str(data_param['default_pred'])[0]}_defpred2_{str(data_param['default_pred2'])[0]}_soft_{str(data_param['soft_constraints'])[0]}_turnover_{str(param['turnover'])[2:]}_weight_{str(param['weight'])[2:]}_trade_{str(param['gamma_trade'])}_hold_{str(param['gamma_hold'])}"
-    with open(f"examples/reservoir_computing/results_risk_return/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}.json", "w+") as f:
-        json.dump(MPO_results, f)
+    # with open(f"examples/reservoir_computing/results_risk_return/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}.json", "w+") as f:
+    #     json.dump(MPO_results, f)
 
     plt.figure()
     for h in H:
@@ -163,7 +163,7 @@ def main() -> int:
     plt.xlabel('Excess risk (annualized)')
     plt.ylabel('Excess return (annualized)')
 
-    plt.savefig(f"examples/reservoir_computing/plots/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}")
+    # plt.savefig(f"examples/reservoir_computing/plots/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}")
 
     plt.figure()
     for h in H:
@@ -179,7 +179,7 @@ def main() -> int:
     plt.xlabel('Excess risk (annualized)')
     plt.ylabel('Excess return (annualized)')
 
-    plt.savefig(f"examples/reservoir_computing/plots/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}_no_u")
+    # plt.savefig(f"examples/reservoir_computing/plots/lr_0{str(reservoir_param['leak_rate'])[-1]}/{name}_no_u")
 
 
 

@@ -136,8 +136,8 @@ def main() -> int:
         MPO_results[f'MPO_H_{h}'] = MPO_result
 
     name = f"long_{str(data_param['long'])[0]}_diagonal_{str(data_param['diagonal_cov'])[0]}_defpred_{str(data_param['default_pred'])[0]}_defpred2_{str(data_param['default_pred2'])[0]}_soft_{str(data_param['soft_constraints'])[0]}_constraint"
-    with open(f"examples/reservoir_computing/results_risk_return/risk_constraint/{name}.json", "w+") as f:
-        json.dump(MPO_results, f)
+    # with open(f"examples/reservoir_computing/results_risk_return/risk_constraint/{name}.json", "w+") as f:
+    #    json.dump(MPO_results, f)
 
 
     plt.figure()
@@ -158,7 +158,7 @@ def main() -> int:
     plt.xlabel('Excess risk (annualized)')
     plt.ylabel('Excess return (annualized)')
 
-    plt.savefig(f"examples/reservoir_computing/plots/risk_constraint/{name}")
+    # plt.savefig(f"examples/reservoir_computing/plots/risk_constraint/{name}")
 
     plt.figure()
     for h in H:
@@ -174,7 +174,7 @@ def main() -> int:
     plt.xlabel('Excess risk (annualized)')
     plt.ylabel('Excess return (annualized)')
 
-    plt.savefig(f"examples/reservoir_computing/plots/risk_constraint/{name}_no_u")
+    # plt.savefig(f"examples/reservoir_computing/plots/risk_constraint/{name}_no_u")
 
 
     plt.show()
